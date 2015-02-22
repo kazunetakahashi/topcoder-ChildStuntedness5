@@ -7,6 +7,8 @@ public:
   vector<double> predict(int testType, int scenario, 
                          vector<string> training, vector<string> testing) {
     vector<double> X;
+    cerr << "testType" << testType << endl;
+    cerr << "scenario" << scenario << endl;
     for (unsigned int i=0; i<training.size(); i++) {
       cerr << "no" << i << endl;
       cerr << training[i] << endl;
