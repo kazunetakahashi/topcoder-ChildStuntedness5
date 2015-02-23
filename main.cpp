@@ -21,8 +21,8 @@ private:
       {10, 12, 18, 19, 20, 21, 22, 23, 24, 25}
     };
   // 自分の
-  vector< vector<string> > test_case_st;
-  vector< vector<double> > test_case;
+  vector< vector<string> > train_case_st;
+  vector< vector<double> > train_case;
   double A[100]; // 係数部分
   double B[100]; // 定数部分 IQ = Ax + B
   double zansa[100];
@@ -36,22 +36,22 @@ private:
     }
     return ans;
   }
-  void make_test_case_st() { // testingをsplit
-    int N = testing.size();
+  void make_train_case_st() { // trainingをsplit
+    int N = training.size();
     for (auto i=0; i<N; i++) {
-      vector<string> sps = split(testing[i]);
-      test_case_st.push_back(sps);
+      vector<string> sps = split(training[i]);
+      train_case_st.push_back(sps);
     }
   }
   void convert_double() { // doubleにする
-    test_case = vector< vector<double> >(test_case_st.size(),
-                                         vector<double>());
-    for (auto i=0; i<test_case_st.size(); i++) {
-      for (auto j=0; j<test_case_st[i].size(); j++) {
-        if (test_case_st[i][j] == "NA") {
-          test_case[i][j] = NA;
+    train_case = vector< vector<double> >(train_case_st.size(),
+                                          vector<double>());
+    for (auto i=0; i<train_case_st.size(); i++) {
+      for (auto j=0; j<train_case_st[i].size(); j++) {
+        if (train_case_st[i][j] == "NA") {
+          train_case[i][j] = NA;
         } else {
-          test_case[i][j] = stof(test_case_st[i][j]);
+          train_case[i][j] = stof(train_case_st[i][j]);
         }
       }
     }
@@ -59,13 +59,13 @@ private:
   void fill_iq() { // iq埋める
     int iq = NA;
     unsigned int ind = 0;
-    while (ind < test_case.size()) {
-      if (test_case[ind][IQ_col] == NA) {
+    while (ind < train_case.size()) {
+      if (train_case[ind][IQ_col] == NA) {
         unsigned int atari = ind+1;
-        while (test_case[atari][ind] == NA) atari++;
-        iq = test_case[atari][ind];
+        while (train_case[atari][ind] == NA) atari++;
+        iq = train_case[atari][ind];
         for (auto i=ind; i<atari; i++) {
-          test_case[i][IQ_col] = iq;
+          train_case[i][IQ_col] = iq;
         }
         ind = atari;
       }
@@ -82,13 +82,13 @@ private:
     int sumy = 0;
     int sumxy = 0;
     int sumx2 = 0;
-    for (auto i=0; i<test_case.size(); i++) {
-      if (issameline(i, col, test_case.begin())) {
+    for (auto i=0; i<train_case.size(); i++) {
+      if (issameline(i, col, train_case.begin())) {
         continue;
       }
       n++;
-      double x = test_case[i][col];
-      double y = test_case[i][IQ_col];
+      double x = train_case[i][col];
+      double y = train_case[i][IQ_col];
       if (x == NA) continue;
       sumx += x;
       sumy += y;
@@ -101,13 +101,13 @@ private:
   void zansa_2jouwa(int col) {
     zansa[col] = 0;
     int n = 0;
-    for (auto i=0; i<test_case.size(); i++) {
-      if (issameline(i, col, test_case.begin())) {
+    for (auto i=0; i<train_case.size(); i++) {
+      if (issameline(i, col, train_case.begin())) {
         continue;
       }
       n++;
-      double x = test_case[i][col];
-      double y = test_case[i][IQ_col];
+      double x = train_case[i][col];
+      double y = train_case[i][IQ_col];
       if (x == NA) continue;
       double sa = y - A[col] * x - B[col];
       zansa[col] += sa * sa;
@@ -127,7 +127,7 @@ private:
     
   }
   void make_training() {
-    make_test_case_st();
+    make_train_case_st();
     convert_double();
     fill_iq();
     calc_all();
