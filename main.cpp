@@ -13,7 +13,7 @@ private:
   vector<string> training;
   vector<string> testing;
   // 定数
-  const double NA = -1000;
+  const double NA = -1000000;
   const int IQ_col = 26;
   const vector< vector<int> > used_col =
     { {11, 13, 14, 15, 16, 17},
@@ -89,6 +89,7 @@ private:
       n++;
       double x = test_case[i][col];
       double y = test_case[i][IQ_col];
+      if (x == NA) continue;
       sumx += x;
       sumy += y;
       sumxy += x * y;
@@ -107,6 +108,7 @@ private:
       n++;
       double x = test_case[i][col];
       double y = test_case[i][IQ_col];
+      if (x == NA) continue;
       double sa = y - A[col] * x - B[col];
       zansa[col] += sa * sa;
     }
