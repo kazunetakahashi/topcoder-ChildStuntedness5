@@ -14,17 +14,36 @@ private:
   vector<string> testing;
   // 定数
   const double NA = -1000000;
-  const int IQ_col = 26;
   const vector< vector<int> > used_col =
     { {11, 13, 14, 15, 16, 17},
       {1, 2, 3, 4, 5, 6, 7, 8, 9},
       {10, 12, 18, 19, 20, 21, 22, 23, 24, 25}
     };
+  const vector< vector<int> > mult_col =
+    { {11, 13, 14, 15, 16, 17},
+      {2, 3, 11, 13, 14, 15, 16, 17},
+      {10, 12, 18, 19, 20, 21, 22, 23, 24, 25}
+    };
+  const int IQ_col = 26;
+  const int inf_iq = 60;
+  const int sup_iq = 140;
+  const int mari_col = 20;
+  const int mari_tranform[7] = {0, 0, 2, 1, 1, 1, 1};
+  const int feed_col = 12;
+  const int feed_NA = 90;
+  const int feed_transform[4] = {0, 2, 0, 1};
+  const int demo1_col = 19;
+  const int demo1_max = 2;
+  const int demo2_col = 25;
+  const int demo2_max = 5;
+  const int born_w_col = 14;
+  const int region_col = 10;
   // 自分の
   vector< vector<string> > train_case_st;
   vector< vector<double> > train_case;
   vector< vector<string> > test_case_st;
   vector< vector<double> > test_case;
+  double reg_transform[100]; // reg
   double A[100]; // 係数部分
   double B[100]; // 定数部分 IQ = Ax + B
   double zansa[100];
@@ -86,6 +105,140 @@ private:
     return (row > 1 && it[row-1][0] == it[row][0]
             && it[row-1][col] == it[row][col]);
   }
+  void average_region() {
+    double sum[100];
+    int cou[100];
+    fill(sum, sum+100, 0);
+    fill(cou, cou+100, 0);
+    for (auto i=0; i<train_case.size(); i++) {
+      if (issameline(i, region_col, train_case.begin())) {
+        continue;
+      }
+      double reg = train_case[i][region_col];
+      if (reg == NA) {
+        continue;
+      }
+      int reg_i = (int)reg;
+      cou[reg_i]++;
+      sum[reg_i] = sum[reg_i] + train_case[i][IQ_col];
+    }
+    vector< pair<double, int> > temp;
+    for (auto i=0; i<100; i++) {
+      if (cou[i] < 10) {
+        reg_transform[i] = NA;
+      } else {
+        // cerr << sum[i] << " " << cou[i] << endl;
+        temp.push_back(make_pair(sum[i]/cou[i], i));
+      }
+    }
+    sort(temp.begin(), temp.end());
+    for (auto i=0; i<temp.size(); i++) {
+      // cerr << "region " << temp[i].second << ": " << temp[i].first << endl;
+      reg_transform[temp[i].second] = i;
+    }
+  }
+  void transform(vector< vector<double> >::iterator b,
+                 vector< vector<double> >::iterator e) {
+    // 結婚状態の数値を適正化。
+    vector< vector<double> >::iterator t = b;
+    while (t != e) {
+      double a = (*t)[mari_col];
+      if (a == NA) {
+        t++;
+        continue;
+      }
+      (*t)[mari_col] = mari_tranform[(int)a];
+      t++;
+    }
+    // 母乳 or not の数値を適正化。
+    t = b;
+    while (t != e) {
+      double a = (*t)[feed_col];
+      if (a == NA || a == feed_NA) {
+        (*t)[mari_col] = NA;
+        t++;
+        continue;
+      }
+      (*t)[mari_col] = feed_transform[(int)a];
+      t++;
+    }
+    // 謎の項目1・2の数値を適正化。
+    // 特に2のほうは、相関性が高いので大事。
+    t = b;
+    while (t != e) {
+      double a = (*t)[demo1_col];
+      if (a == NA || a <= 0 || a > demo1_max) {
+        (*t)[demo1_col] = NA;
+        t++;
+        continue;
+      }
+      t++;      
+    }
+    t = b;
+    while (t != e) {
+      double a = (*t)[demo2_col];
+      if (a == NA || a <= 0 || a > demo2_max) {
+        (*t)[demo1_col] = NA;
+        t++;
+        continue;
+      }
+      t++;      
+    }
+    // 出生時体重を1000で割る
+    t = b;
+    while (t != e) {
+      double a = (*t)[born_w_col];
+      if (a == NA) {
+        t++;
+        continue;
+      }
+      (*t)[born_w_col] = a/1000;
+      t++;      
+    }
+    // 横長(4)を身長(3)に統合
+    t = b;
+    while (t != e) {
+      double a = (*t)[4];
+      if (a == NA) {
+        t++;
+        continue;
+      }
+      (*t)[3] = a;
+      t++;
+    }
+    // 体重・身長・横長を「傾き」で置き換える。出生時は+12で求まる。
+    for (auto col=2; col<=3; col++) {
+      int col_b = col+12;
+      t = b;
+      while (t != e) {
+        double a = (*t)[col];
+        if (a == NA) {
+          t++;
+          continue;
+        }
+        double b = (*t)[1];
+        if (b < 10) {
+          (*t)[col] = NA;
+          t++;
+          continue;
+        }
+        (*t)[col] = (a-(*t)[col_b])/b;
+        t++;
+      }
+    }
+    // 地域をtransformする。
+    t = b;
+    while (t != e) {
+      double a = (*t)[region_col];
+      if (a == NA) {
+        t++;
+        continue;
+      }
+      (*t)[region_col] = reg_transform[(int)a];
+      t++;
+      // if ((*t)[region_col] != NA) cerr << (*t)[region_col] << endl;
+    }
+  }
   void calc_AB(int col) { // ABする
     int n = 0;
     double sumx = 0;
@@ -141,12 +294,6 @@ private:
     }
     sort(ranking.begin(), ranking.end());
   }
-  void make_training() {
-    make_train_case_st();
-    convert_double();
-    fill_iq();
-    calc_all();
-  }
   void make_test_case_st() { // testingをsplit
     int N = testing.size();
     for (auto i=0; i<N; i++) {
@@ -185,10 +332,10 @@ private:
         double y = A[u] * x + B[u];
         // cerr << "y = " << y << endl;
         int predict = 100;
-        if (y < 85) {
-          predict = 85;
-        } else if (y > 115) {
-          predict = 115;
+        if (y < inf_iq) {
+          predict = inf_iq;
+        } else if (y > sup_iq) {
+          predict = sup_iq;
         } else predict = (int)y;
         if (again) {
           temp[temp.size()-1].second = predict;
@@ -202,9 +349,18 @@ private:
       X.push_back(temp[i].second);
     }
   }
+  void make_training() {
+    make_train_case_st();
+    convert_double();
+    fill_iq();
+    average_region();
+    transform(train_case.begin(), train_case.end());
+    calc_all();
+  }
   void make_testing() {
     make_test_case_st();
     convert_double_test();
+    transform(test_case.begin(), test_case.end());
     make_X();
   }
   //  main theorems

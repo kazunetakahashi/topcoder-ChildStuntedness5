@@ -9,8 +9,8 @@ int main() {
     T.push_back(str);
   }
   ChildStuntedness5 c;
-  vector<double> ans = c.predict(0, 0, T, T);
+  vector<double> ans = c.predict(2, 2, T, T);
   for (auto i=0; i<ans.size(); i++) {
-    cout << ans[i] << endl;
+    // cout << ans[i] << endl;
   }
 }
