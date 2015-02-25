@@ -28,7 +28,6 @@ private:
   const int inf_iq = 60;
   const int sup_iq = 140;
   const int mari_col = 20;
-  const int mari_tranform[7] = {0, 0, 2, 1, 1, 1, 1};
   const int feed_col = 12;
   const int feed_NA = 90;
   const int feed_transform[4] = {0, 2, 0, 1};
@@ -44,6 +43,7 @@ private:
   vector< vector<string> > test_case_st;
   vector< vector<double> > test_case;
   double reg_transform[100]; // reg
+  double mari_transform[7];
   double A[100]; // 係数部分
   double B[100]; // 定数部分 IQ = Ax + B
   double zansa[100];
@@ -105,16 +105,16 @@ private:
     return (row > 1 && it[row-1][0] == it[row][0]
             && it[row-1][col] == it[row][col]);
   }
-  void average_region() {
+  void average_col(int col, double* tra, int siz) {
     double sum[100];
     int cou[100];
     fill(sum, sum+100, 0);
     fill(cou, cou+100, 0);
     for (auto i=0; i<train_case.size(); i++) {
-      if (issameline(i, region_col, train_case.begin())) {
+      if (issameline(i, col, train_case.begin())) {
         continue;
       }
-      double reg = train_case[i][region_col];
+      double reg = train_case[i][col];
       if (reg == NA) {
         continue;
       }
@@ -123,9 +123,9 @@ private:
       sum[reg_i] = sum[reg_i] + train_case[i][IQ_col];
     }
     vector< pair<double, int> > temp;
-    for (auto i=0; i<100; i++) {
+    for (auto i=0; i<siz; i++) {
       if (cou[i] < 10) {
-        reg_transform[i] = NA;
+        tra[i] = NA;
       } else {
         // cerr << sum[i] << " " << cou[i] << endl;
         temp.push_back(make_pair(sum[i]/cou[i], i));
@@ -134,7 +134,7 @@ private:
     sort(temp.begin(), temp.end());
     for (auto i=0; i<temp.size(); i++) {
       // cerr << "region " << temp[i].second << ": " << temp[i].first << endl;
-      reg_transform[temp[i].second] = i;
+      tra[temp[i].second] = i;
     }
   }
   void transform(vector< vector<double> >::iterator b,
@@ -147,7 +147,7 @@ private:
         t++;
         continue;
       }
-      (*t)[mari_col] = mari_tranform[(int)a];
+      (*t)[mari_col] = mari_transform[(int)a];
       t++;
     }
     // 母乳 or not の数値を適正化。
@@ -353,7 +353,8 @@ private:
     make_train_case_st();
     convert_double();
     fill_iq();
-    average_region();
+    average_col(mari_col, mari_transform, 7);
+    average_col(region_col, reg_transform, 100);
     transform(train_case.begin(), train_case.end());
     calc_all();
   }
