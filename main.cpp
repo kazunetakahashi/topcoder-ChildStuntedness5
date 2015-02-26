@@ -3,7 +3,74 @@
 #include <sstream>
 #include <tuple>
 #include <algorithm>
+#include <valarray>
+// #define NDEBUG
+#include <cassert>
 using namespace std;
+
+// 行列
+struct matrix {
+  int row, col;
+  valarray<double> a;
+  matrix(int N, int M) {
+    a = valarray<double>(N * M);
+    a = 0;
+    row = N;
+    col = M;
+  }
+};
+
+matrix multiply(matrix A, matrix B) {
+  assert(A.col == B.row);
+  int N = A.col;
+  matrix C(A.row, B.col);
+  for (auto i=0; i<A.row; i++) {
+    for (auto j=0; j<B.col; j++) {
+      C.a[i*N + j] = ((valarray<double>)A.a[slice(i*A.row, N, 1)] *
+                      (valarray<double>)B.a[slice(j, N, B.col)]).sum();
+    }
+  }
+  return C;
+}
+
+matrix inverse(matrix A, matrix B) { // A^{-1} B を出力
+  // 計算機による誤差は考慮しない。
+  assert(A.row == A.col);
+  assert(A.col == B.row);
+  int N = A.row;
+  int M = B.col;
+  for (auto i=0; i<N; i++) {
+    double taikaku = A.a[i*N+i];
+    A.a[i*N+i] = 1;
+    for (auto j=i+1; j<N; j++) {
+      A.a[i*N+j] /= taikaku;
+    }
+    for (auto j=0; j<M; j++) {
+      B.a[i*N+j] /= taikaku;
+    }
+    for (auto k=i+1; k<N; k++) {
+      double keisu = A.a[k*N+i];
+      A.a[k*N+i] = 0;
+      for (auto j=i; j<N; j++) {
+        A.a[k*N+j] -= keisu * A.a[i*N+j];
+      }
+      for (auto j=0; j<M; j++) {
+        B.a[k*N+j] -= keisu * A.a[i*N+j];
+      }
+    }
+  }
+  return B;
+}
+
+matrix transposed(matrix A) {
+  matrix B = matrix(A.col, A.row);
+  for (auto i=0; i<B.row; i++) {
+    for (auto j=0; j<B.col; j++) {
+      B.a[i*B.row + j] = A.a[j*B.row + i];
+    }
+  }
+  return B;
+}
 
 class ChildStuntedness5 {
 private:
