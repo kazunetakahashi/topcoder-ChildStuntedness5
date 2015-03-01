@@ -94,16 +94,17 @@ private:
   const vector<vector< vector<int> > > mult_col =
     {
       { {11, 13, 14, 15, 16, 17},
-        {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
-        {10, 11, 12, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
+        {2, 3, 5, 11, 13, 14, 15, 16, 17},
+        {10, 12, 18, 19, 20, 21, 22, 23, 24, 25}
+        // {10, 12, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
       },
       { {11, 13, 14, 15, 16, 17},
-        {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
-        {4, 10, 11, 12, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
+        {2, 3, 5, 11, 13, 14, 15, 16, 17},
+        {10, 12, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
       },
       { {11, 13, 14, 15, 16, 17},
-        {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
-        {4, 10, 11, 12, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
+        {2, 3, 5, 11, 13, 14, 15, 16, 17},
+        {10, 12, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
       }
     };
   const int IQ_col = 26;
@@ -521,10 +522,8 @@ private:
   }
   
   void make_X() {
-    bool useid = (scenario != 1);
-    int r = (useid ? test_case_id.size() : test_case.size());
-    vector< vector<double> >::iterator it =
-      (useid ? test_case_id.begin() : test_case.begin());
+    // bool useid = (scenario != 1);
+    int r = test_case.size();
     vector< pair<int, int> > temp; // id, iq 
     for (auto i=0; i<r; i++) {
       // cerr << "i = " << i << endl;
@@ -537,7 +536,7 @@ private:
         if (!(get<1>(ranking_mult[j]))) {
           int u = get<2>(ranking_mult[j]);
           // cerr << "u = " << u << endl;
-          double x = it[i][u];
+          double x = test_case[i][u];
           if (x == NA) continue;
           y = A[u] * x + B[u];
           // cerr << "y = " << y << endl;
@@ -545,10 +544,10 @@ private:
           int id = get<2>(ranking_mult[j]);
           matrix beta = get<3>(ranking_mult[j]);
           int m = 0;
-          double y = 0;
+          y = 0;
           for (auto k=0; k<num_col; k++) {
             if( (id >> k & 1) == 1) {
-              double x = it[i][mult_col[testType][scenario][k]];
+              double x = test_case[i][mult_col[testType][scenario][k]];
               if (x == NA) {
                 no_na = false;
                 break;
@@ -574,6 +573,7 @@ private:
         break;
       }
     }
+    cerr << "size: " << temp.size() << endl;
     for (auto i=0; i<temp.size(); i++) {
       X.push_back(temp[i].second);
     }
@@ -599,7 +599,7 @@ private:
 public:
   vector<double> predict(int _testType, int _scenario, 
                          vector<string> _training, vector<string> _testing) {
-    const auto start = chrono::system_clock::now();
+    // const auto start = chrono::system_clock::now();
     testType = _testType;
     scenario = _scenario;
     training = _training;
@@ -607,9 +607,9 @@ public:
     init();
     make_training();
     make_testing();
-    const auto end = chrono::system_clock::now();
+    /* const auto end = chrono::system_clock::now();
     const auto t = end - start;
-    cerr << chrono::duration_cast<chrono::milliseconds>(t).count()/1000 << endl;
+    cerr << chrono::duration_cast<chrono::milliseconds>(t).count()/1000 << endl; */
     return X;
   }
 };
