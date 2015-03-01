@@ -1,10 +1,11 @@
+#include <chrono>
 #include <iostream>
 #include <vector>
 #include <sstream>
 #include <tuple>
 #include <algorithm>
 #include <valarray>
-// #define NDEBUG
+#define NDEBUG
 #include <cassert>
 using namespace std;
 
@@ -14,9 +15,14 @@ struct matrix {
   valarray<double> a;
   matrix(int N, int M) {
     a = valarray<double>(N * M);
-    a = 0;
     row = N;
     col = M;
+  }
+  bool operator<( const matrix& right ) const { // 使わないけどtupleに必要
+    return row < right.row;
+  }
+  bool operator>( const matrix& right ) const { // 使わないけどtupleに必要
+    return row > right.row;
   }
 };
 
@@ -24,39 +30,38 @@ matrix multiply(matrix A, matrix B) {
   assert(A.col == B.row);
   int N = A.col;
   matrix C(A.row, B.col);
-  for (auto i=0; i<A.row; i++) {
-    for (auto j=0; j<B.col; j++) {
-      C.a[i*N + j] = ((valarray<double>)A.a[slice(i*A.row, N, 1)] *
-                      (valarray<double>)B.a[slice(j, N, B.col)]).sum();
+  for (auto i=0; i<C.row; i++) {
+    for (auto j=0; j<C.col; j++) {
+      C.a[i*C.col + j] = ((valarray<double>)A.a[slice(i*A.col, N, 1)] *
+                          (valarray<double>)B.a[slice(j, N, B.col)]).sum();
     }
   }
   return C;
 }
 
 matrix inverse(matrix A, matrix B) { // A^{-1} B を出力
-  // 計算機による誤差は考慮しない。
   assert(A.row == A.col);
   assert(A.col == B.row);
   int N = A.row;
   int M = B.col;
   for (auto i=0; i<N; i++) {
     double taikaku = A.a[i*N+i];
-    A.a[i*N+i] = 1;
-    for (auto j=i+1; j<N; j++) {
-      A.a[i*N+j] /= taikaku;
-    }
-    for (auto j=0; j<M; j++) {
-      B.a[i*N+j] /= taikaku;
-    }
-    for (auto k=i+1; k<N; k++) {
-      double keisu = A.a[k*N+i];
-      A.a[k*N+i] = 0;
-      for (auto j=i; j<N; j++) {
-        A.a[k*N+j] -= keisu * A.a[i*N+j];
+    for (auto k=0; k<N; k++) {
+      if (i == k) continue;
+      double keisu = A.a[k*N+i]/taikaku;
+      // A.a[k*N+i] = 0;
+      for (auto j=i+1; j<N; j++) {
+        A.a[k*N+j] = A.a[k*N+j] - keisu * A.a[i*N+j];
       }
       for (auto j=0; j<M; j++) {
-        B.a[k*N+j] -= keisu * A.a[i*N+j];
+        B.a[k*M+j] = B.a[k*M+j] - keisu * B.a[i*M+j];
       }
+    }
+  }
+  for (auto i=0; i<N; i++) {
+    double taikaku = A.a[i*N+i];
+    for (auto j=0; j<M; j++) {
+      B.a[i*M+j] = B.a[i*M+j]/taikaku;
     }
   }
   return B;
@@ -66,7 +71,7 @@ matrix transposed(matrix A) {
   matrix B = matrix(A.col, A.row);
   for (auto i=0; i<B.row; i++) {
     for (auto j=0; j<B.col; j++) {
-      B.a[i*B.col + j] = A.a[j*B.col + i];
+      B.a[i*B.col + j] = A.a[j*A.col + i];
     }
   }
   return B;
@@ -86,10 +91,20 @@ private:
       {1, 2, 3, 4, 5, 6, 7, 8, 9},
       {10, 12, 18, 19, 20, 21, 22, 23, 24, 25}
     };
-  const vector< vector<int> > mult_col =
-    { {11, 13, 14, 15, 16, 17},
-      {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
-      {10, 12, 18, 19, 20, 21, 22, 23, 24, 25}
+  const vector<vector< vector<int> > > mult_col =
+    {
+      { {11, 13, 14, 15, 16, 17},
+        {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
+        {10, 11, 12, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
+      },
+      { {11, 13, 14, 15, 16, 17},
+        {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
+        {4, 10, 11, 12, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
+      },
+      { {11, 13, 14, 15, 16, 17},
+        {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
+        {4, 10, 11, 12, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25}
+      }
     };
   const int IQ_col = 26;
   const int inf_iq = 60;
@@ -111,19 +126,18 @@ private:
   vector< vector<string> > test_case_st;
   vector< vector<double> > test_case;
   vector< vector<double> > test_case_id;
-  int num_col = 0; // mult_col[scenario].size()
+  int num_col = 0; // mult_col[testType][scenario].size()
   double reg_transform[100]; // reg
   double mari_transform[7];
   double A[100]; // 係数部分
   double B[100]; // 定数部分 IQ = Ax + B
   double zansa[100];
-  vector< tuple<double, 
-                bool, int, matrix> > ranking_mult; // zansa, mult?, id, beta 
+  vector< tuple<double, bool, int, matrix> > ranking_mult; // zansa, mult?, id, beta 
   vector<double> X; // answer
   
   // lemmas
   void init() {
-    num_col = mult_col[scenario].size();
+    num_col = mult_col[testType][scenario].size();
   }
   
   vector<string> split(string S) { // コンマでsprit
@@ -405,26 +419,29 @@ private:
       n++;
       double sa = y - A[col] * x - B[col];
       // cerr << sa << endl;
-      zansa[col] += sa * sa;
+      zansa[col] = zansa[col] + sa * sa;
     }
-    zansa[col] /= n;
+    zansa[col] = zansa[col]/n;
     // cerr << col << ": " << (long long)zansa[col] << endl;
+    // cerr << A[col] << " " << B[col] << endl;
   }
   
   void calc_mult_zansa(int id) {
     int n = 0;
     bool useid = (scenario != 1);
+    // cerr << "num_col = " << num_col << endl; 
     for (auto i=0; i<num_col; i++) {
       if( (id >> i & 1) == 1) n++;
     }
     if (n < 2) return;
-    int r = (useid ? test_case_id.size() : test_case.size());
+    int r = (useid ? train_case_id.size() : train_case.size());
+    // cerr << "r = " << r << endl;
     vector< vector<double> >::iterator it =
-      (useid ? test_case_id.begin() : test_case.begin());
+      (useid ? train_case_id.begin() : train_case.begin());
     vector<int> valid;
     for (auto j=0; j<r; j++) {
       for (auto i=0; i<num_col; i++) {
-        if ( (id >> i & 1) == 1 && it[j][mult_col[scenario][i]] == NA ) {
+        if ( (id >> i & 1) == 1 && it[j][mult_col[testType][scenario][i]] == NA ) {
           goto EXIT;
         }
       }
@@ -436,38 +453,41 @@ private:
     if (100 * row_n < r) { // 小さすぎるので棄却
       return;
     }
+    // cerr << "row_n = " << row_n << ", n+1 = " << n+1 << endl;
     matrix X(row_n, n+1);
     for (auto j=0; j<row_n; j++) {
       int m = 0;
       for (auto i=0; i<num_col; i++) {
         if ( (id >> i & 1) == 1 ) {
-          X.a[j * X.col + m] = it[valid[j]][mult_col[scenario][i]];
+          // cerr << "j=" << j << " " << "m=" << m << endl;
+          X.a[j * X.col + m] = it[valid[j]][mult_col[testType][scenario][i]];
           m++;
         }
       }
+      // cerr << "j=" << j << " " << "m=" << m << endl;
+      X.a[j * X.col + m] = 1;
     }
+    matrix y(row_n, 1);
     for (auto j=0; j<row_n; j++) {
-      X.a[j * X.col + n] = 1;
-    }
-    matrix y(r, 1);
-    for (auto j=0; j<row_n; j++) {
+      // cerr << "j=" << j << endl;
       y.a[j] = it[valid[j]][IQ_col];
     }
+    // cerr << "y" << endl;
     matrix Xt = transposed(X);
-    matrix beta =  inverse(multiply(Xt, X), multiply(Xt, y));
-    double zansa_t = 0;
-    for (auto j=0; j<row_n; j++) {
-      int m = 0;
-      double sa = y.a[j];
-      for (auto i=0; i<num_col; i++) {
-        if ( (id >> i & 1) == 1 ) {
-          sa -= beta.a[m++] * it[valid[j]][mult_col[scenario][i]];
-        }
-      }
-      sa -= beta.a[m];
-      zansa_t = sa * sa;
+    // cerr << "Xt" << endl;
+    matrix beta = inverse(multiply(Xt, X), multiply(Xt, y));
+    /* cerr << "beta" << endl;
+    for (auto i=0; i<beta.a.size(); i++) {
+      cerr << beta.a[i] << " ";
     }
-    zansa_t /= row_n;
+    cerr << endl; */
+    double zansa_t = 0;
+    valarray<double> eps = y.a - multiply(X, beta).a;
+    for (auto i=0; i<eps.size(); i++) {
+      zansa_t = zansa_t + eps[i] * eps[i];
+    }
+    zansa_t = zansa_t/row_n;
+    // cerr << "id = " << id << ", zansa_t = " << (long long)zansa_t << endl;
     ranking_mult.push_back(make_tuple(zansa_t, true, id, beta));
   }
 
@@ -485,11 +505,19 @@ private:
 
   void calc_all_mult() {
     calc_all_single();
+    cerr << "single completed" << endl;
     int tot = (1 << num_col);
     for (auto id=0; id<tot; id++) {
+      // cerr << "id = " << id << endl;
       calc_mult_zansa(id);
     }
     sort(ranking_mult.begin(), ranking_mult.end());
+    for (auto i=0; i<10; i++) {
+      if (get<1>(ranking_mult[i]))
+        cerr << "i = " << i
+             << ", zansa = " << get<0>(ranking_mult[i])
+             << ", id = " << get<2>(ranking_mult[i]) << endl;
+    }
   }
   
   void make_X() {
@@ -499,16 +527,18 @@ private:
       (useid ? test_case_id.begin() : test_case.begin());
     vector< pair<int, int> > temp; // id, iq 
     for (auto i=0; i<r; i++) {
+      // cerr << "i = " << i << endl;
       bool again = false;
       if (temp.size() > 0 &&
           test_case[i][0] == temp[temp.size()-1].first) again = true;
       for (auto j=0; j<ranking_mult.size(); j++) {
         double y = 100;
+        bool no_na = true;
         if (!(get<1>(ranking_mult[j]))) {
           int u = get<2>(ranking_mult[j]);
           // cerr << "u = " << u << endl;
           double x = it[i][u];
-          if (x == NA) goto EXIT2;
+          if (x == NA) continue;
           y = A[u] * x + B[u];
           // cerr << "y = " << y << endl;
         } else {
@@ -518,12 +548,16 @@ private:
           double y = 0;
           for (auto k=0; k<num_col; k++) {
             if( (id >> k & 1) == 1) {
-              double x = it[i][mult_col[scenario][i]];
-              if (x == NA) goto EXIT2;
-              y += x * beta.a[m++];
+              double x = it[i][mult_col[testType][scenario][k]];
+              if (x == NA) {
+                no_na = false;
+                break;
+              }
+              y = y + x * beta.a[m++];
             }
           }
-          y += beta.a[m];
+          if (!no_na) continue;
+          y = y + beta.a[m];
         }
         int predict = 100;
         if (y < inf_iq) {
@@ -538,8 +572,6 @@ private:
           temp.push_back(make_pair(test_case[i][0], predict));
         }
         break;
-      EXIT2:
-        continue;
       }
     }
     for (auto i=0; i<temp.size(); i++) {
@@ -567,6 +599,7 @@ private:
 public:
   vector<double> predict(int _testType, int _scenario, 
                          vector<string> _training, vector<string> _testing) {
+    const auto start = chrono::system_clock::now();
     testType = _testType;
     scenario = _scenario;
     training = _training;
@@ -574,6 +607,9 @@ public:
     init();
     make_training();
     make_testing();
+    const auto end = chrono::system_clock::now();
+    const auto t = end - start;
+    cerr << chrono::duration_cast<chrono::milliseconds>(t).count()/1000 << endl;
     return X;
   }
 };

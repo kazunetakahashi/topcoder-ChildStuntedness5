@@ -1,4 +1,5 @@
 #include <fstream>
+#include <chrono>
 #include "main.cpp"
 
 int main() {
@@ -9,7 +10,7 @@ int main() {
     T.push_back(str);
   }
   ChildStuntedness5 c;
-  vector<double> ans = c.predict(2, 2, T, T);
+  vector<double> ans = c.predict(0, 2, T, T);
   for (auto i=0; i<ans.size(); i++) {
     // cout << ans[i] << endl;
   }
