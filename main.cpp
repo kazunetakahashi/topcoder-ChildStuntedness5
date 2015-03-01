@@ -88,7 +88,7 @@ private:
     };
   const vector< vector<int> > mult_col =
     { {11, 13, 14, 15, 16, 17},
-      {2, 3, 11, 13, 14, 15, 16, 17},
+      {2, 3, 4, 5, 11, 13, 14, 15, 16, 17},
       {10, 12, 18, 19, 20, 21, 22, 23, 24, 25}
     };
   const int IQ_col = 26;
@@ -117,7 +117,8 @@ private:
   double A[100]; // 係数部分
   double B[100]; // 定数部分 IQ = Ax + B
   double zansa[100];
-  vector< pair<double, int> > ranking;
+  vector< tuple<double, 
+                bool, int, matrix> > ranking_mult; // zansa, mult?, id, beta 
   vector<double> X; // answer
   
   // lemmas
@@ -407,64 +408,123 @@ private:
       zansa[col] += sa * sa;
     }
     zansa[col] /= n;
-    cerr << col << ": " << (long long)zansa[col] << endl;
+    // cerr << col << ": " << (long long)zansa[col] << endl;
   }
   
-  matrix calc_mult(int id) {
+  void calc_mult_zansa(int id) {
     int n = 0;
     bool useid = (scenario != 1);
     for (auto i=0; i<num_col; i++) {
       if( (id >> i & 1) == 1) n++;
     }
+    if (n < 2) return;
     int r = (useid ? test_case_id.size() : test_case.size());
-    matrix X(r, n+1);
     vector< vector<double> >::iterator it =
       (useid ? test_case_id.begin() : test_case.begin());
-    int m = 0;
-    for (auto i=0; i<num_col; i++) {
-      if( (id >> i & 1) == 1) {
-        for (auto j=0; j<r; j++) {
-          X.a[j * X.col + m] = it[j][mult_col[scenario][i]];
+    vector<int> valid;
+    for (auto j=0; j<r; j++) {
+      for (auto i=0; i<num_col; i++) {
+        if ( (id >> i & 1) == 1 && it[j][mult_col[scenario][i]] == NA ) {
+          goto EXIT;
         }
-        m++;
+      }
+      valid.push_back(j);
+    EXIT:
+      continue;
+    }
+    int row_n = (int)valid.size();
+    if (100 * row_n < r) { // 小さすぎるので棄却
+      return;
+    }
+    matrix X(row_n, n+1);
+    for (auto j=0; j<row_n; j++) {
+      int m = 0;
+      for (auto i=0; i<num_col; i++) {
+        if ( (id >> i & 1) == 1 ) {
+          X.a[j * X.col + m] = it[valid[j]][mult_col[scenario][i]];
+          m++;
+        }
       }
     }
-    for (auto j=0; j<r; j++) {
-      X.a[j * X.col + m] = 1;
+    for (auto j=0; j<row_n; j++) {
+      X.a[j * X.col + n] = 1;
     }
     matrix y(r, 1);
-    for (auto j=0; j<r; j++) {
-      y.a[j] = it[j][IQ_col];
+    for (auto j=0; j<row_n; j++) {
+      y.a[j] = it[valid[j]][IQ_col];
     }
     matrix Xt = transposed(X);
-    return inverse(multiply(Xt, X), multiply(Xt, y));
+    matrix beta =  inverse(multiply(Xt, X), multiply(Xt, y));
+    double zansa_t = 0;
+    for (auto j=0; j<row_n; j++) {
+      int m = 0;
+      double sa = y.a[j];
+      for (auto i=0; i<num_col; i++) {
+        if ( (id >> i & 1) == 1 ) {
+          sa -= beta.a[m++] * it[valid[j]][mult_col[scenario][i]];
+        }
+      }
+      sa -= beta.a[m];
+      zansa_t = sa * sa;
+    }
+    zansa_t /= row_n;
+    ranking_mult.push_back(make_tuple(zansa_t, true, id, beta));
   }
-  
-  void calc_all() {
+
+  void calc_all_single() {
     for (auto i=0; i<=scenario; i++) {
       for (auto j=0; j<used_col[i].size(); j++) {
         int c = used_col[i][j];
         calc_AB(c);
         zansa_2jouwa(c);
-        ranking.push_back(make_pair(zansa[c], c));
+        matrix temp(0, 0);
+        ranking_mult.push_back(make_tuple(zansa[c], false, c, temp));
       }
     }
-    sort(ranking.begin(), ranking.end());
+  }
+
+  void calc_all_mult() {
+    calc_all_single();
+    int tot = (1 << num_col);
+    for (auto id=0; id<tot; id++) {
+      calc_mult_zansa(id);
+    }
+    sort(ranking_mult.begin(), ranking_mult.end());
   }
   
   void make_X() {
+    bool useid = (scenario != 1);
+    int r = (useid ? test_case_id.size() : test_case.size());
+    vector< vector<double> >::iterator it =
+      (useid ? test_case_id.begin() : test_case.begin());
     vector< pair<int, int> > temp; // id, iq 
-    for (auto i=0; i<test_case.size(); i++) {
+    for (auto i=0; i<r; i++) {
       bool again = false;
       if (temp.size() > 0 &&
           test_case[i][0] == temp[temp.size()-1].first) again = true;
-      for (auto j=0; j<ranking.size(); j++) {
-        int u = ranking[j].second;
-        // cerr << "u = " << u << endl;
-        double x = test_case[i][u];
-        if (x == NA) continue;
-        double y = A[u] * x + B[u];
-        // cerr << "y = " << y << endl;
+      for (auto j=0; j<ranking_mult.size(); j++) {
+        double y = 100;
+        if (!(get<1>(ranking_mult[j]))) {
+          int u = get<2>(ranking_mult[j]);
+          // cerr << "u = " << u << endl;
+          double x = it[i][u];
+          if (x == NA) goto EXIT2;
+          y = A[u] * x + B[u];
+          // cerr << "y = " << y << endl;
+        } else {
+          int id = get<2>(ranking_mult[j]);
+          matrix beta = get<3>(ranking_mult[j]);
+          int m = 0;
+          double y = 0;
+          for (auto k=0; k<num_col; k++) {
+            if( (id >> k & 1) == 1) {
+              double x = it[i][mult_col[scenario][i]];
+              if (x == NA) goto EXIT2;
+              y += x * beta.a[m++];
+            }
+          }
+          y += beta.a[m];
+        }
         int predict = 100;
         if (y < inf_iq) {
           predict = inf_iq;
@@ -472,11 +532,14 @@ private:
           predict = sup_iq;
         } else predict = (int)y;
         if (again) {
-          temp[temp.size()-1].second = predict;
+          temp[temp.size()-1].second 
+            = (predict + temp[temp.size()-1].second)/2;
         } else {
           temp.push_back(make_pair(test_case[i][0], predict));
         }
         break;
+      EXIT2:
+        continue;
       }
     }
     for (auto i=0; i<temp.size(); i++) {
@@ -490,7 +553,7 @@ private:
     average_col(region_col, reg_transform, 100);
     transform(train_case.begin(), train_case.end());
     make_train_case_id();
-    calc_all();
+    calc_all_mult();
   }
   
   void make_testing() {
